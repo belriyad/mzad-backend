@@ -1,0 +1,42 @@
+{
+  "model_type": "GradientBoosting",
+  "features_numeric": [
+    "car_age",
+    "km",
+    "cylinder_count"
+  ],
+  "features_categorical": [
+    "make",
+    "class_name",
+    "fuel_type",
+    "gear_type",
+    "car_type",
+    "city",
+    "warranty_status",
+    "seller_type"
+  ],
+  "rmse": 36640.0469376248,
+  "mae": 17407.71487113784,
+  "r2": 0.8118442882618665,
+  "training_date": "2026-04-13T06:23:31.487470",
+  "train_records": 20457,
+  "test_records": 5115,
+  "train_stats": {
+    "medians": {
+      "car_age": 10.0,
+      "km": 135000.0,
+      "cylinder_count": 4.0
+    },
+    "modes": {
+      "make": "Toyota",
+      "class_name": "Land Cruiser",
+      "fuel_type": "Petrol",
+      "gear_type": "Automatic",
+      "car_type": "SUV",
+      "city": "Doha",
+      "warranty_status": "No",
+      "seller_type": "private"
+    }
+  },
+  "model_version": "1.0.0"
+}

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mzad Local DB Search</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <h1>Mzad Local DB Search</h1>
+        <p>Search listings stored in local SQLite and ready for Supabase export.</p>
+        <div id="summary" class="summary"></div>
+        <div id="summary-extra" class="summary-extra"></div>
+        <div class="summary-runs">
+          <div id="summary-runs-meta" class="summary-runs-meta">Collection runs will appear here.</div>
+          <div class="summary-runs-table-wrap">
+            <table class="summary-runs-table">
+              <thead>
+                <tr>
+                  <th>Run ID</th>
+                  <th>Started</th>
+                  <th>Finished</th>
+                  <th>Duration</th>
+                  <th>Pages</th>
+                  <th>New Rows</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="summary-runs-body">
+                <tr>
+                  <td colspan="7">No run data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </header>
+
+      <section class="layout">
+        <aside class="side-filters">
+          <h2>Filters</h2>
+          <div class="alerts-block">
+            <h3>Check My Car Value</h3>
+            <label>
+              Make
+              <select id="val-make">
+                <option value="">Select make</option>
+              </select>
+            </label>
+            <label>
+              Class
+              <select id="val-class">
+                <option value="">Select class</option>
+              </select>
+            </label>
+            <label>
+              Model (optional)
+              <select id="val-model">
+                <option value="">Any model</option>
+              </select>
+            </label>
+            <label>
+              Year
+              <select id="val-year">
+                <option value="">Select year</option>
+              </select>
+            </label>
+            <label>
+              Mileage (KM)
+              <select id="val-km">
+                <option value="">Select mileage</option>
+              </select>
+            </label>
+            <div class="notify-actions">
+              <button id="check-value">Check Value Dial</button>
+              <button id="fill-from-filters" class="secondary">Use Filter Values</button>
+            </div>
+            <div id="value-summary" class="alerts-meta">Enter details and run estimate.</div>
+            <svg id="value-dial" viewBox="0 0 280 160" class="value-dial">
+              <path id="dial-arc" d="" stroke="#dfe6e2" stroke-width="18" fill="none" stroke-linecap="round"></path>
+              <line id="dial-low-mark" x1="0" y1="0" x2="0" y2="0" stroke="#6b7280" stroke-width="2"></line>
+              <line id="dial-fair-mark" x1="0" y1="0" x2="0" y2="0" stroke="#0a6f54" stroke-width="3"></line>
+              <line id="dial-high-mark" x1="0" y1="0" x2="0" y2="0" stroke="#6b7280" stroke-width="2"></line>
+              <line id="dial-user-mark" x1="0" y1="0" x2="0" y2="0" stroke="#b42318" stroke-width="4"></line>
+              <text id="dial-label-low" x="18" y="144" font-size="12" fill="#4b5563">Low</text>
+              <text id="dial-label-fair" x="122" y="18" font-size="12" fill="#0a6f54">Fair</text>
+              <text id="dial-label-high" x="232" y="144" font-size="12" fill="#4b5563">High</text>
+            </svg>
+          </div>
+          <label>
+            Source
+            <select id="source">
+              <option value="all" selected>All sources</option>
+              <option value="mzad">Mzad only</option>
+              <option value="qatarliving">QatarLiving only</option>
+            </select>
+          </label>
+          <label>
+            Search
+            <input id="search" type="search" placeholder="title, make, class, city" />
+          </label>
+          <label>
+            Make
+            <select id="make">
+              <option value="">All makes</option>
+            </select>
+          </label>
+          <label>
+            Class
+            <select id="class_name">
+              <option value="">All classes</option>
+            </select>
+          </label>
+          <label>
+            Model
+            <select id="model">
+              <option value="">All models</option>
+            </select>
+          </label>
+          <label>
+            City
+            <select id="city">
+              <option value="">All cities</option>
+            </select>
+          </label>
+          <label>
+            Sort
+            <select id="sort">
+              <option value="deal_desc">Best Deal (business score)</option>
+              <option value="listing_date_desc">Listing date newest first</option>
+              <option value="listing_date_asc">Listing date oldest first</option>
+              <option value="discount_desc">Discount rate high to low</option>
+              <option value="discount_asc">Discount rate low to high</option>
+              <option value="price_desc">Price high to low</option>
+              <option value="price_asc">Price low to high</option>
+              <option value="year_desc">Year newest first</option>
+              <option value="km_asc">Mileage low to high</option>
+              <option value="title_asc">Title A-Z</option>
+            </select>
+          </label>
+          <label>
+            Deals only
+            <select id="deals-only">
+              <option value="0">No</option>
+              <option value="1" selected>Yes</option>
+            </select>
+          </label>
+
+          <div class="range-block">
+            <h3>Year</h3>
+            <input id="year-min-slider" type="range" />
+            <input id="year-max-slider" type="range" />
+            <div class="range-readout"><span id="year-min-val"></span><span id="year-max-val"></span></div>
+          </div>
+
+          <div class="range-block">
+            <h3>Price (QAR)</h3>
+            <input id="price-min-slider" type="range" />
+            <input id="price-max-slider" type="range" />
+            <div class="range-readout"><span id="price-min-val"></span><span id="price-max-val"></span></div>
+          </div>
+
+          <div class="range-block">
+            <h3>Mileage (KM)</h3>
+            <input id="km-min-slider" type="range" />
+            <input id="km-max-slider" type="range" />
+            <div class="range-readout"><span id="km-min-val"></span><span id="km-max-val"></span></div>
+          </div>
+
+          <div class="range-block">
+            <h3>Discount %</h3>
+            <input id="discount-min-slider" type="range" />
+            <input id="discount-max-slider" type="range" />
+            <div class="range-readout"><span id="discount-min-val"></span><span id="discount-max-val"></span></div>
+          </div>
+
+          <div class="range-block">
+            <h3>Peers</h3>
+            <input id="peer-min-slider" type="range" />
+            <input id="peer-max-slider" type="range" />
+            <div class="range-readout"><span id="peer-min-val"></span><span id="peer-max-val"></span></div>
+          </div>
+
+          <label>
+            Limit
+            <input id="limit" type="number" min="1" max="1000" value="100" />
+          </label>
+          <button id="run">Apply Filters</button>
+          <p class="meta">
+            Deal rationale: same make/class/year and close mileage peers. Ranked by discount% weighted by peer depth.
+          </p>
+
+          <div class="alerts-block">
+            <h3>Notifications</h3>
+            <label>
+              User key
+              <input id="notify-user-key" type="text" placeholder="e.g. briyad" />
+            </label>
+            <div class="browser-notify">
+              <div class="alerts-meta">WhatsApp notifications</div>
+              <label>
+                WhatsApp number (E.164)
+                <input id="wa-number" type="text" placeholder="+974XXXXXXXX" />
+              </label>
+              <label class="inline-check">
+                <input id="wa-enabled" type="checkbox" />
+                Enable WhatsApp alerts
+              </label>
+              <div class="notify-actions">
+                <button id="save-wa-channel" class="secondary">Save WhatsApp</button>
+                <button id="test-wa-channel" class="secondary">Send WA Test</button>
+              </div>
+              <div id="wa-status" class="notify-status">Not configured</div>
+            </div>
+            <div class="notify-actions">
+              <button id="save-alert">Save Alert From Filters</button>
+              <button id="refresh-notify" class="secondary">Refresh</button>
+            </div>
+            <label class="inline-check">
+              <input id="unread-only" type="checkbox" checked />
+              Unread only
+            </label>
+            <div class="browser-notify">
+              <div class="alerts-meta">Web Push notifications</div>
+              <div id="browser-notify-status" class="notify-status">Not enabled</div>
+              <div class="notify-actions">
+                <button id="enable-browser-notify" class="secondary">Enable Push</button>
+                <button id="test-browser-notify" class="secondary">Push Test</button>
+              </div>
+              <div class="alerts-meta">Requires HTTPS + browser support for Service Worker and Push API.</div>
+            </div>
+            <div class="alerts-meta">Saved alerts</div>
+            <div id="alerts-list" class="panel-list"></div>
+            <div class="alerts-meta">Notifications</div>
+            <div id="notifications-list" class="panel-list"></div>
+            <button id="mark-all-read" class="secondary">Mark All Read</button>
+          </div>
+        </aside>
+
+        <section class="table-wrap">
+        <div id="meta" class="meta"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Price (QAR)</th>
+              <th>Make</th>
+              <th>Class</th>
+              <th>Year</th>
+              <th>KM</th>
+              <th>Warranty</th>
+              <th>Cylinders</th>
+              <th>Listing Date</th>
+              <th>Expected (QAR)</th>
+              <th>Discount %</th>
+              <th>Deal Score</th>
+              <th>Peers</th>
+              <th>City</th>
+              <th>URL</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

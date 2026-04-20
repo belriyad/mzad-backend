@@ -1,0 +1,2119 @@
+openapi: 3.0.3
+info:
+  title: Mzad Cars Backend API
+  version: 2.0.0
+  description: |
+    API contract for listings, valuation, alerts, notifications, push/WhatsApp channels,
+    authentication, user/profile management, and listing CRUD.
+servers:
+  - url: http://localhost:8090/api
+    description: Local development
+  - url: http://192.168.1.149:8090/api
+    description: LAN backend
+tags:
+  - name: Auth
+  - name: Users
+  - name: Profile
+  - name: Listings
+  - name: Insights
+  - name: Alerts
+  - name: Notifications
+  - name: Channels
+  - name: Push
+  - name: Collector
+  - name: MLValuation
+  - name: InstantOffers
+security:
+  - bearerAuth: []
+  - guestToken: []
+paths:
+  /auth/guest/login:
+    post:
+      tags: [Auth]
+      summary: Issue guest token
+      security: []
+      responses:
+        "200":
+          description: Guest token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a user account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/phone and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password for current authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Password changed and new tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/request-reset:
+    post:
+      tags: [Auth]
+      summary: "Request password reset token (dev: token returned in response)"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: { type: string, description: email or phone }
+      responses:
+        "200":
+          description: Reset token issued if account exists
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with reset token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reset_token, new_password]
+              properties:
+                reset_token: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Password reset and tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/admin-bootstrap:
+    post:
+      tags: [Auth]
+      summary: Create first admin account (only when no admin exists)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke current session/token
+      responses:
+        "200":
+          description: Logged out
+  /users:
+    get:
+      tags: [Users]
+      summary: List users (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+  /users/{user_id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID (admin)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      tags: [Users]
+      summary: Replace user role and status (admin)
+      description: Fully replaces role and is_active. Both fields are required.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, is_active]
+              properties:
+                role:
+                  type: string
+                  enum: [guest, user, dealer, admin]
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      tags: [Users]
+      summary: Update user role/status (admin)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [guest, user, dealer, admin]
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: User updated
+    delete:
+      tags: [Users]
+      summary: Delete/deactivate user (admin)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: User deleted
+  /me:
+    get:
+      tags: [Profile]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /me/profile:
+    get:
+      tags: [Profile]
+      summary: Get profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      tags: [Profile]
+      summary: Replace profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    patch:
+      tags: [Profile]
+      summary: Patch profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+  /listings:
+    get:
+      tags: [Listings]
+      summary: Search and filter listings
+      parameters:
+        - in: query
+          name: source
+          schema:
+            type: string
+            enum: [all, mzad, qatarliving]
+          description: Filter by marketplace source
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: make
+          schema: { type: string }
+        - in: query
+          name: class_name
+          schema: { type: string }
+        - in: query
+          name: model
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+        - in: query
+          name: deals_only
+          schema: { type: string, enum: ["0", "1"], default: "0" }
+        - in: query
+          name: min_year
+          schema: { type: integer }
+        - in: query
+          name: max_year
+          schema: { type: integer }
+        - in: query
+          name: min_price
+          schema: { type: number }
+        - in: query
+          name: max_price
+          schema: { type: number }
+        - in: query
+          name: min_km
+          schema: { type: number }
+        - in: query
+          name: max_km
+          schema: { type: number }
+        - in: query
+          name: min_discount_pct
+          schema: { type: number }
+        - in: query
+          name: max_discount_pct
+          schema: { type: number }
+        - in: query
+          name: min_peer_count
+          schema: { type: integer }
+        - in: query
+          name: max_peer_count
+          schema: { type: integer }
+        - in: query
+          name: include_unapproved
+          schema: { type: string, enum: ["0", "1"], default: "0" }
+          description: Admin only. Include listings with is_approved=false.
+        - in: query
+          name: include_views
+          schema: { type: string, enum: ["0", "1"], default: "0" }
+          description: Include per-listing view_count when set to 1.
+        - in: query
+          name: is_approved
+          schema: { type: string, enum: ["0", "1", "any"], default: "1" }
+          description: |
+            Approval filter.
+            `1` = approved only (public default),
+            `0` = unapproved only (admin),
+            `any` = all listings regardless of approval (admin).
+      responses:
+        "200":
+          description: Listing search result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingsResponse"
+    post:
+      tags: [Listings]
+      summary: Create listing
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingCreate"
+      responses:
+        "201":
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+  /listings/{product_id}:
+    get:
+      tags: [Listings]
+      summary: Get listing by ID
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+        - in: query
+          name: include_unapproved
+          schema: { type: string, enum: ["0", "1"], default: "0" }
+          description: Admin only. Include listing even when is_approved=false.
+      responses:
+        "200":
+          description: Listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+    put:
+      tags: [Listings]
+      summary: Replace listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingCreate"
+      responses:
+        "200":
+          description: Listing updated
+    patch:
+      tags: [Listings]
+      summary: Patch listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingUpdate"
+      responses:
+        "200":
+          description: Listing updated
+    delete:
+      tags: [Listings]
+      summary: Delete listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Listing removed
+  /listings/{product_id}/peers:
+    get:
+      tags: [Listings]
+      summary: Get peer listings and expected price baseline
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Peer analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingPeersResponse"
+  /listings/{product_id}/view:
+    post:
+      tags: [Listings]
+      summary: Track listing view (public telemetry)
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_key: { type: string }
+      responses:
+        "200":
+          description: View tracked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+  /listings/{product_id}/price-history:
+    get:
+      tags: [Listings]
+      summary: Internal listing price history with daily deal snapshot
+      description: Internal endpoint (not part of external contract).
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        price_qar: { type: number }
+                        recorded_at: { type: string, format: date-time }
+                        deal_score: { type: number, nullable: true }
+                        discount_pct: { type: number, nullable: true }
+  /uploads:
+    post:
+      tags: [Listings]
+      summary: Upload a file blob (base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, content_base64]
+              properties:
+                filename: { type: string }
+                mime_type: { type: string }
+                content_base64: { type: string }
+      responses:
+        "201":
+          description: Uploaded
+  /favorites:
+    get:
+      tags: [Listings]
+      summary: Get favorites for current actor (token) or user_key
+      parameters:
+        - in: query
+          name: user_key
+          schema: { type: string }
+      responses:
+        "200":
+          description: Favorite rows
+    post:
+      tags: [Listings]
+      summary: Add listing to favorites
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id: { type: string }
+                user_key: { type: string }
+      responses:
+        "201":
+          description: Favorite created
+  /favorites/{id}:
+    delete:
+      tags: [Listings]
+      summary: Remove favorite by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: user_key
+          schema: { type: string }
+      responses:
+        "204":
+          description: Favorite removed
+  /summary:
+    get:
+      tags: [Insights]
+      summary: Dashboard summary
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalListings: { type: integer }
+                  topMakes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        count: { type: integer }
+                  phoneStats:
+                    type: object
+                    properties:
+                      listingsWithPhone: { type: integer }
+                      uniquePhoneNumbers: { type: integer }
+                      coveragePct: { type: number, format: float }
+                  approvalStats:
+                    type: object
+                    properties:
+                      approved: { type: integer }
+                      pending: { type: integer }
+                  sourceStats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        source: { type: string, enum: [mzad, qatarliving] }
+                        listings: { type: integer }
+                        listingsWithPhone: { type: integer }
+                        uniquePhoneNumbers: { type: integer }
+                  collectionRunStats:
+                    type: object
+                    properties:
+                      totalRuns: { type: integer }
+                      totalNewRows: { type: integer }
+                      totalPagesScanned: { type: integer }
+                      lastFinishedAt: { type: string, nullable: true }
+                      avgNewRowsPerRun: { type: number, format: float }
+                  collectionRuns:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        startedAt: { type: string, nullable: true }
+                        finishedAt: { type: string, nullable: true }
+                        durationSeconds: { type: integer, nullable: true }
+                        pagesScanned: { type: integer }
+                        newRows: { type: integer }
+                        notes: { type: string }
+                  freshStock:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        make: { type: string }
+                        count: { type: integer }
+                  dealDistribution:
+                    type: object
+                    properties:
+                      hot_count: { type: integer }
+                      good_count: { type: integer }
+                      fair_count: { type: integer }
+                      overpriced_count: { type: integer }
+                      unscored_count: { type: integer }
+                  avgPriceByMake:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        make: { type: string }
+                        avg_price: { type: integer }
+                        listing_count: { type: integer }
+  /spotted:
+    get:
+      tags: [Insights]
+      summary: Top spotted listings cache with scoring reasons
+      responses:
+        "200":
+          description: Spotted listings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/Listing"
+                        - type: object
+                          properties:
+                            score: { type: integer }
+                            spot_reasons: { type: string, description: JSON array string of badge reasons }
+  /ranges:
+    get:
+      tags: [Insights]
+      summary: Filter ranges
+      responses:
+        "200":
+          description: Ranges for UI sliders
+  /img-proxy:
+    get:
+      tags: [Insights]
+      summary: Proxy remote listing images from approved hosts
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema: { type: string }
+          description: Remote image URL (allowed hosts only)
+      responses:
+        "200":
+          description: Image bytes
+        "403":
+          description: Origin not allowed
+        "502":
+          description: Proxy error
+  /value-estimate:
+    get:
+      tags: [Insights]
+      summary: Estimate low/fair/high value from comparable cars
+      parameters:
+        - in: query
+          name: make
+          required: true
+          schema: { type: string }
+        - in: query
+          name: class_name
+          required: true
+          schema: { type: string }
+        - in: query
+          name: model
+          schema: { type: string }
+        - in: query
+          name: year
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: km
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Value band
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: Get saved alerts for user key
+      parameters:
+        - in: query
+          name: user_key
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Alert list
+    post:
+      tags: [Alerts]
+      summary: Create alert from selected filters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertCreate"
+      responses:
+        "200":
+          description: Created
+  /alerts/active:
+    post:
+      tags: [Alerts]
+      summary: Enable/disable alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alert_id, active]
+              properties:
+                alert_id: { type: integer }
+                active: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Get notifications
+      parameters:
+        - in: query
+          name: user_key
+          required: true
+          schema: { type: string }
+        - in: query
+          name: unread_only
+          schema: { type: string, enum: ["0", "1"], default: "0" }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Notification list
+  /notifications/mark-read:
+    post:
+      tags: [Notifications]
+      summary: Mark notifications as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_key: { type: string }
+                ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200":
+          description: Updated
+  /channels:
+    get:
+      tags: [Channels]
+      summary: Get channel config (WhatsApp) for user
+      parameters:
+        - in: query
+          name: user_key
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Channel status
+    post:
+      tags: [Channels]
+      summary: Upsert channel config (WhatsApp)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_key]
+              properties:
+                user_key: { type: string }
+                whatsapp_number: { type: string, example: "+97455551234" }
+                whatsapp_enabled: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+  /channels/test-whatsapp:
+    post:
+      tags: [Channels]
+      summary: Send WhatsApp test message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_key]
+              properties:
+                user_key: { type: string }
+      responses:
+        "200":
+          description: Test result
+  /push/public-key:
+    get:
+      tags: [Push]
+      summary: Get VAPID public key/config status
+      responses:
+        "200":
+          description: Push config
+  /push/status:
+    get:
+      tags: [Push]
+      summary: Get push subscription status for user
+      parameters:
+        - in: query
+          name: user_key
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Push status
+  /push/subscribe:
+    post:
+      tags: [Push]
+      summary: Upsert push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_key, subscription]
+              properties:
+                user_key: { type: string }
+                subscription:
+                  type: object
+                  properties:
+                    endpoint: { type: string }
+                    keys:
+                      type: object
+                      properties:
+                        p256dh: { type: string }
+                        auth: { type: string }
+      responses:
+        "200":
+          description: Subscribed
+  /push/unsubscribe:
+    post:
+      tags: [Push]
+      summary: Disable push subscription(s)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_key: { type: string }
+                endpoint: { type: string }
+      responses:
+        "200":
+          description: Unsubscribed
+  /push/test:
+    post:
+      tags: [Push]
+      summary: Send push test message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_key]
+              properties:
+                user_key: { type: string }
+      responses:
+        "200":
+          description: Test result
+  /collector/run:
+    post:
+      tags: [Collector]
+      summary: Trigger incremental collector run
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Trigger result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  new_rows: { type: integer }
+                  deals:
+                    type: object
+                    properties:
+                      ok: { type: boolean }
+                      updated_rows: { type: integer }
+                      computed_at: { type: string, format: date-time }
+                  price_history_rows: { type: integer }
+  /deals/recompute:
+    post:
+      tags: [Collector]
+      summary: Recompute and persist per-car deal metrics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recompute result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  updated_rows: { type: integer }
+                  computed_at: { type: string, format: date-time }
+  /admin/listings/{product_id}/approval:
+    post:
+      tags: [Listings]
+      summary: Admin flip listing approval flag
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_approved]
+              properties:
+                is_approved: { type: boolean }
+      responses:
+        "200":
+          description: Approval updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  listing:
+                    $ref: "#/components/schemas/Listing"
+  /ml/estimate:
+    get:
+      tags: [MLValuation]
+      summary: ML-powered car price estimate (model v6 — LightGBM + Optuna)
+      description: |
+        Returns a price estimate using a segmented LightGBM model tuned with Optuna
+        (budget ≤120k QAR / premium >120k QAR).
+
+        **For best accuracy supply all fields marked required plus as many optional
+        fields as known.** The model handles missing values internally but accuracy
+        degrades without key inputs.
+
+        Feature importance ranking (from v6 training):
+        | Rank | Field | Budget importance | Premium importance |
+        |------|-------|:-----------------:|:-----------------:|
+        | 1 | `km` | ★★★★★ | ★★★★★ |
+        | 2 | `class_name` | ★★★★★ | ★★★★★ |
+        | 3 | `manufacture_year` | ★★★★★ | ★★★★★ |
+        | 4 | `make` | ★★★★☆ | ★★★★☆ |
+        | 5 | `trim` | ★★★★☆ | ★★★★★ |
+        | 6 | `cylinder_count` | ★★★☆☆ | ★★★☆☆ |
+        | 7 | `car_type` | ★★★☆☆ | ★★☆☆☆ |
+        | 8 | `warranty_status` | ★★☆☆☆ | ★★★☆☆ |
+        | 9 | `fuel_type` | ★★☆☆☆ | ★★☆☆☆ |
+        | 10 | `gear_type` | ★☆☆☆☆ | ★☆☆☆☆ |
+        | 11 | `city` | ★☆☆☆☆ | ★☆☆☆☆ |
+        | 12 | `seller_type` | ★☆☆☆☆ | ★☆☆☆☆ |
+      parameters:
+        # ── Required fields (core of every estimate) ───────────────────────
+        - in: query
+          name: make
+          required: true
+          schema: { type: string }
+          example: Toyota
+          description: "Car manufacturer. Required."
+        - in: query
+          name: class_name
+          required: true
+          schema: { type: string }
+          example: Land Cruiser
+          description: "Model name (e.g. Land Cruiser, Patrol, Camry). Required."
+        - in: query
+          name: manufacture_year
+          required: true
+          schema: { type: integer, minimum: 1990, maximum: 2030 }
+          example: 2021
+          description: "Year of manufacture. Required."
+        - in: query
+          name: km
+          required: true
+          schema: { type: number, minimum: 0 }
+          example: 80000
+          description: "Odometer reading in kilometres. Required."
+        # ── High-impact optional fields (strongly recommended) ─────────────
+        - in: query
+          name: trim
+          required: false
+          schema: { type: string }
+          example: VXR
+          description: >
+            Trim / variant level. Strongly recommended — large price spreads
+            exist between trims (e.g. GXR vs VXR on Land Cruiser can differ
+            by 20–30k QAR). Examples: GXR, VXR, SE, Platinum, Sport, TRD,
+            Limited, S-Line, AMG.
+        - in: query
+          name: cylinder_count
+          required: false
+          schema: { type: integer, minimum: 2, maximum: 16 }
+          example: 6
+          description: "Number of engine cylinders. Recommended."
+        - in: query
+          name: car_type
+          required: false
+          schema: { type: string, enum: [Sedan, SUV, Pickup, Hatchback, Coupe, Van, Convertible, Wagon] }
+          description: "Body type. Recommended."
+        - in: query
+          name: warranty_status
+          required: false
+          schema: { type: string, enum: [Under Warranty, No Warranty, Extended Warranty] }
+          description: "Warranty status. Particularly impactful for premium segment."
+        # ── Lower-impact optional fields ────────────────────────────────────
+        - in: query
+          name: fuel_type
+          required: false
+          schema: { type: string, enum: [Petrol, Diesel, Hybrid, Electric] }
+        - in: query
+          name: gear_type
+          required: false
+          schema: { type: string, enum: [Automatic, Manual] }
+        - in: query
+          name: city
+          required: false
+          schema: { type: string }
+          example: Doha
+        - in: query
+          name: seller_type
+          required: false
+          schema: { type: string, enum: [dealer, private] }
+      responses:
+        "200":
+          description: ML price estimate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MLEstimate"
+              example:
+                estimated_price_qar: 199653
+                confidence_range: [170610, 228696]
+                segment: premium
+                model_version: "6.0.0"
+                r2: 0.7013
+                mape: 12.04
+        "400":
+          description: Missing required parameter (make, class_name, manufacture_year, or km)
+  /instant-offers/comps:
+    get:
+      tags: [InstantOffers]
+      summary: Market comparables for a car
+      parameters:
+        - in: query
+          name: make
+          required: true
+          schema: { type: string }
+        - in: query
+          name: class_name
+          required: true
+          schema: { type: string }
+        - in: query
+          name: model
+          schema: { type: string }
+        - in: query
+          name: year
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: km
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Market comparables
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferComps"
+  /instant-offers/requests:
+    get:
+      tags: [InstantOffers]
+      summary: List offer requests (dealer sees open pool, customer sees their own)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: make
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: Offer requests list
+    post:
+      tags: [InstantOffers]
+      summary: Create an offer request (customer)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferRequestCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: "#/components/schemas/OfferRequest"
+  /instant-offers/requests/mine:
+    get:
+      tags: [InstantOffers]
+      summary: List current user's own offer requests
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: My offer requests
+  /instant-offers/requests/{request_uid}:
+    get:
+      tags: [InstantOffers]
+      summary: Get offer request detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      responses:
+        "200":
+          description: Offer request detail
+  /instant-offers/requests/{request_uid}/bids:
+    post:
+      tags: [InstantOffers]
+      summary: Place a bid (dealer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferBidCreate"
+      responses:
+        "201":
+          description: Bid placed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bid:
+                    $ref: "#/components/schemas/OfferBid"
+  /instant-offers/requests/{request_uid}/accept-bid:
+    post:
+      tags: [InstantOffers]
+      summary: Accept a bid (customer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bid_uid]
+              properties:
+                bid_uid: { type: string }
+      responses:
+        "200":
+          description: Bid accepted
+  /instant-offers/requests/{request_uid}/reject-bid:
+    post:
+      tags: [InstantOffers]
+      summary: Reject a specific bid (customer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bid_uid]
+              properties:
+                bid_uid: { type: string }
+      responses:
+        "200":
+          description: Bid rejected
+  /instant-offers/requests/{request_uid}/cancel:
+    post:
+      tags: [InstantOffers]
+      summary: Cancel offer request (customer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      responses:
+        "200":
+          description: Cancelled
+  /instant-offers/requests/{request_uid}/decline:
+    post:
+      tags: [InstantOffers]
+      summary: Dealer passes on (declines) a request without bidding
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      responses:
+        "200":
+          description: Declined
+  /instant-offers/requests/{request_uid}/messages:
+    get:
+      tags: [InstantOffers]
+      summary: List messages for an offer request thread
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: Messages list
+    post:
+      tags: [InstantOffers]
+      summary: Send a message on an offer request thread
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient_id, body]
+              properties:
+                recipient_id: { type: string }
+                body: { type: string }
+      responses:
+        "201":
+          description: Message sent
+  /instant-offers/bids/mine:
+    get:
+      tags: [InstantOffers]
+      summary: List current dealer's bids
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: My bids
+  /instant-offers/bids/{bid_uid}:
+    patch:
+      tags: [InstantOffers]
+      summary: Update a pending bid (dealer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BidUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount_qar: { type: integer }
+                message: { type: string }
+                expires_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Bid updated
+  /instant-offers/bids/{bid_uid}/withdraw:
+    post:
+      tags: [InstantOffers]
+      summary: Withdraw a pending bid (dealer only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BidUid"
+      responses:
+        "200":
+          description: Withdrawn
+  /instant-offers/preferences:
+    get:
+      tags: [InstantOffers]
+      summary: Get dealer offer notification preferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Preferences
+    put:
+      tags: [InstantOffers]
+      summary: Upsert dealer offer notification preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealerPreferences"
+      responses:
+        "200":
+          description: Preferences saved
+  /admin/instant-offers/requests:
+    get:
+      tags: [InstantOffers]
+      summary: Admin — list all offer requests
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: customer_id
+          schema: { type: string }
+        - in: query
+          name: make
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: All offer requests
+  /admin/instant-offers/requests/{request_uid}/moderate:
+    post:
+      tags: [InstantOffers]
+      summary: Admin — force cancel or expire an offer request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [cancelled, expired] }
+      responses:
+        "200":
+          description: Moderated
+  /admin/instant-offers/bids:
+    get:
+      tags: [InstantOffers]
+      summary: Admin — list all bids
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: dealer_id
+          schema: { type: string }
+        - in: query
+          name: request_uid
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: All bids
+
+  # BE-001: Phone Approval Workflow
+  /instant-offers/requests/{request_uid}/phone-request:
+    post:
+      tags: [InstantOffers]
+      summary: Dealer requests access to seller's phone number
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Phone request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  status: { type: string }
+        "400":
+          description: Already requested or offer not found
+        "401":
+          description: Unauthorized
+        "403":
+          description: Dealer account required
+  /instant-offers/requests/{request_uid}/phone-request/approve:
+    post:
+      tags: [InstantOffers]
+      summary: Customer approves a dealer's phone access request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dealer_id]
+              properties:
+                dealer_id: { type: string }
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  status: { type: string }
+  /instant-offers/requests/{request_uid}/phone-request/reject:
+    post:
+      tags: [InstantOffers]
+      summary: Customer rejects a dealer's phone access request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dealer_id]
+              properties:
+                dealer_id: { type: string }
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  status: { type: string }
+  /instant-offers/requests/{request_uid}/phone-requests:
+    get:
+      tags: [InstantOffers]
+      summary: Customer views all phone access requests for their offer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RequestUid"
+      responses:
+        "200":
+          description: List of phone access requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  phone_requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PhoneAccessRequest"
+
+  # BE-003: Dealer Subscription
+  /instant-offers/subscription:
+    get:
+      tags: [InstantOffers]
+      summary: Get dealer's subscription status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Subscription info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealerSubscription"
+        "403":
+          description: Dealer account required
+
+  # BE-004: Saved Dealer Filters
+  /instant-offers/filters:
+    get:
+      tags: [InstantOffers]
+      summary: List dealer's saved filter presets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved filters with match counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filters:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DealerSavedFilter"
+    post:
+      tags: [InstantOffers]
+      summary: Create a new saved filter preset
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealerSavedFilterCreate"
+      responses:
+        "201":
+          description: Filter created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filter:
+                    $ref: "#/components/schemas/DealerSavedFilter"
+  /instant-offers/filters/{filter_id}:
+    delete:
+      tags: [InstantOffers]
+      summary: Delete a saved filter preset
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: filter_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "403":
+          description: Not your filter
+        "404":
+          description: Filter not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    guestToken:
+      type: apiKey
+      in: header
+      name: X-Guest-Token
+  parameters:
+    ProductId:
+      in: path
+      name: product_id
+      required: true
+      schema: { type: string }
+    UserId:
+      in: path
+      name: user_id
+      required: true
+      schema: { type: string }
+    RequestUid:
+      in: path
+      name: request_uid
+      required: true
+      schema: { type: string }
+    BidUid:
+      in: path
+      name: bid_uid
+      required: true
+      schema: { type: string }
+  schemas:
+    AuthTokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 3600 }
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        full_name: { type: string }
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string, description: email or phone }
+        password: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        role: { type: string, enum: [guest, user, dealer, admin] }
+        email: { type: string, format: email }
+        phone: { type: string }
+        full_name: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Profile:
+      type: object
+      properties:
+        user_id: { type: string }
+        full_name: { type: string }
+        avatar_url: { type: string }
+        preferred_language: { type: string }
+        timezone: { type: string }
+        city: { type: string }
+    ProfileUpdate:
+      type: object
+      properties:
+        full_name: { type: string }
+        avatar_url: { type: string }
+        preferred_language: { type: string }
+        timezone: { type: string }
+        city: { type: string }
+    Listing:
+      type: object
+      properties:
+        product_id: { type: string }
+        title: { type: string }
+        price_qar: { type: number }
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string }
+        manufacture_year: { type: integer }
+        km: { type: integer }
+        warranty_status: { type: string }
+        cylinder_count: { type: integer }
+        seller_name: { type: string }
+        seller_phone: { type: string }
+        seller_type: { type: string }
+        seller_whatsapp: { type: string }
+        seller_user_id: { type: string }
+        is_company: { type: string, description: "'1' for company/dealer account in source payload" }
+        city: { type: string }
+        url: { type: string }
+        description: { type: string }
+        main_image_url: { type: string }
+        image_urls_json: { type: string, description: JSON array string from feed images }
+        all_image_urls_json: { type: string, description: JSON array string from detail endpoint images }
+        properties_json: { type: string, description: JSON array string of all listing properties/tags }
+        comments_count: { type: integer }
+        comments_json: { type: string, description: JSON array string of listing comments }
+        expected_price_qar: { type: number }
+        discount_qar: { type: number }
+        discount_pct: { type: number, description: Deal percentage for this car vs similar peers }
+        peer_count: { type: integer }
+        mileage_window_km: { type: integer }
+        deal_score: { type: number }
+        deal_reason: { type: string }
+        deal_last_computed_at: { type: string, format: date-time }
+        is_approved: { type: boolean, description: True when owner/admin has approved listing for public visibility }
+        listing_date: { type: string, format: date }
+        view_count: { type: integer, description: Present when include_views=1 or on single-listing endpoint }
+        score: { type: integer, description: Present on /spotted rows }
+        spot_reasons: { type: string, description: JSON array string; present on /spotted rows }
+    ListingCreate:
+      type: object
+      required: [title, price_qar, make, class_name]
+      properties:
+        title: { type: string }
+        price_qar: { type: number }
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string }
+        manufacture_year: { type: integer }
+        km: { type: integer }
+        warranty_status: { type: string }
+        cylinder_count: { type: integer }
+        seller_name: { type: string }
+        seller_phone: { type: string }
+        seller_type: { type: string }
+        seller_whatsapp: { type: string }
+        seller_user_id: { type: string }
+        is_company: { type: string }
+        city: { type: string }
+        url: { type: string }
+        description: { type: string }
+        main_image_url: { type: string }
+        image_urls_json: { type: string }
+        all_image_urls_json: { type: string }
+        properties_json: { type: string }
+        comments_count: { type: integer }
+        comments_json: { type: string }
+    ListingUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        price_qar: { type: number }
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string }
+        manufacture_year: { type: integer }
+        km: { type: integer }
+        warranty_status: { type: string }
+        cylinder_count: { type: integer }
+        seller_name: { type: string }
+        seller_phone: { type: string }
+        seller_type: { type: string }
+        seller_whatsapp: { type: string }
+        seller_user_id: { type: string }
+        is_company: { type: string }
+        city: { type: string }
+        url: { type: string }
+        description: { type: string }
+        main_image_url: { type: string }
+        image_urls_json: { type: string }
+        all_image_urls_json: { type: string }
+        properties_json: { type: string }
+        comments_count: { type: integer }
+        comments_json: { type: string }
+    ListingsResponse:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/Listing"
+        makes:
+          type: array
+          items: { type: string }
+        classes:
+          type: array
+          items: { type: string }
+        models:
+          type: array
+          items: { type: string }
+        cities:
+          type: array
+          items: { type: string }
+    ListingPeer:
+      type: object
+      properties:
+        product_id: { type: string }
+        title: { type: string }
+        price_qar: { type: number }
+        km: { type: integer }
+        manufacture_year: { type: integer }
+        main_image_url: { type: string }
+        city: { type: string }
+        discount_pct: { type: number, nullable: true }
+        source: { type: string, enum: [mzad, qatarliving] }
+    ListingPeersResponse:
+      type: object
+      properties:
+        product_id: { type: string }
+        computed_at: { type: string, format: date-time }
+        peer_count: { type: integer }
+        expected_price_qar: { type: number, nullable: true }
+        mileage_window_km: { type: integer }
+        peers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingPeer"
+    AlertCreate:
+      type: object
+      required: [user_key]
+      properties:
+        user_key: { type: string }
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string }
+        city: { type: string }
+        search_text: { type: string }
+        min_year: { type: integer }
+        max_year: { type: integer }
+        min_price_qar: { type: integer }
+        max_price_qar: { type: integer }
+        min_km: { type: integer }
+        max_km: { type: integer }
+        deals_only: { type: boolean }
+        min_discount_pct: { type: number }
+        max_discount_pct: { type: number }
+        min_peer_count: { type: integer }
+        max_peer_count: { type: integer }
+    MLEstimate:
+      type: object
+      properties:
+        estimated_price_qar:
+          type: number
+          description: Point estimate in QAR
+        confidence_range:
+          type: array
+          description: "[low, high] range in QAR based on ±MAE of the segment model"
+          items: { type: number }
+          minItems: 2
+          maxItems: 2
+        segment:
+          type: string
+          enum: [budget, premium]
+          description: budget = ≤120k QAR, premium = >120k QAR
+        model_version:
+          type: string
+          description: Trained model version
+        r2:
+          type: number
+          description: R² of the segment model on held-out test data
+        mape:
+          type: number
+          description: Mean absolute percentage error of the segment model (%)
+    OfferRequest:
+      type: object
+      properties:
+        id: { type: integer }
+        request_uid: { type: string }
+        customer_id: { type: string }
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string, nullable: true }
+        year: { type: integer }
+        km: { type: integer }
+        color: { type: string, nullable: true }
+        condition: { type: string, enum: [excellent, good, fair, poor] }
+        city: { type: string }
+        description: { type: string, nullable: true }
+        photo_urls_json: { type: string, nullable: true }
+        asking_price_qar: { type: integer, nullable: true }
+        contact_name: { type: string, nullable: true }
+        contact_phone: { type: string, nullable: true }
+        status: { type: string, enum: [open, under_offer, accepted, pending, rejected, expired, cancelled] }
+        accepted_bid_id: { type: integer, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    OfferRequestCreate:
+      type: object
+      required: [make, class_name, year, km, condition, city]
+      properties:
+        make: { type: string }
+        class_name: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        km: { type: integer }
+        color: { type: string }
+        condition: { type: string, enum: [excellent, good, fair, poor] }
+        city: { type: string }
+        description: { type: string }
+        photo_urls_json: { type: string }
+        asking_price_qar: { type: integer }
+        contact_name: { type: string }
+        contact_phone: { type: string }
+        expires_at: { type: string, format: date-time }
+    OfferBid:
+      type: object
+      properties:
+        id: { type: integer }
+        bid_uid: { type: string }
+        request_id: { type: integer }
+        dealer_id: { type: string }
+        amount_qar: { type: integer }
+        message: { type: string, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [pending, accepted, rejected, withdrawn, expired] }
+        is_expired: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    OfferBidCreate:
+      type: object
+      required: [amount_qar]
+      properties:
+        amount_qar: { type: integer }
+        message: { type: string }
+        expires_at: { type: string, format: date-time }
+    OfferComps:
+      type: object
+      properties:
+        count: { type: integer }
+        median: { type: number, nullable: true }
+        p25: { type: number, nullable: true }
+        p75: { type: number, nullable: true }
+        min: { type: number, nullable: true }
+        max: { type: number, nullable: true }
+        avg: { type: number, nullable: true }
+        samples:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id: { type: string }
+              title: { type: string }
+              price_qar: { type: number }
+              km: { type: integer }
+              manufacture_year: { type: integer }
+              city: { type: string }
+              main_image_url: { type: string }
+    DealerPreferences:
+      type: object
+      properties:
+        makes:
+          type: array
+          items: { type: string }
+        cities:
+          type: array
+          items: { type: string }
+        min_year: { type: integer }
+        max_year: { type: integer }
+        max_km: { type: integer }
+        notify_push: { type: boolean }
+        notify_whatsapp: { type: boolean }
+        active: { type: boolean }
+    PhoneAccessRequest:
+      type: object
+      properties:
+        dealer_id: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        requested_at: { type: string, format: date-time }
+        responded_at: { type: string, format: date-time, nullable: true }
+    DealerSubscription:
+      type: object
+      properties:
+        is_active: { type: boolean }
+        plan: { type: string, nullable: true }
+        amount_qar: { type: number, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        next_billing: { type: string, format: date-time, nullable: true }
+    DealerSavedFilter:
+      type: object
+      properties:
+        id: { type: integer }
+        dealer_id: { type: integer }
+        name: { type: string }
+        makes:
+          type: array
+          items: { type: string }
+        cities:
+          type: array
+          items: { type: string }
+        min_year: { type: integer, nullable: true }
+        max_year: { type: integer, nullable: true }
+        max_km: { type: integer, nullable: true }
+        condition: { type: string, nullable: true }
+        match_count: { type: integer }
+        created_at: { type: string, format: date-time }
+    DealerSavedFilterCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        makes:
+          type: array
+          items: { type: string }
+        cities:
+          type: array
+          items: { type: string }
+        min_year: { type: integer }
+        max_year: { type: integer }
+        max_km: { type: integer }
+        condition: { type: string }
