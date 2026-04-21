@@ -123,5 +123,33 @@ export const listingsService = {
       r2: number;
       mape: number;
     }>(`/ml/estimate?${search.toString()}`);
-  }
+  },
+  forecast(params: {
+    make: string;
+    class_name: string;
+    trim?: string;
+    manufacture_year: string;
+    km: number;
+    fuel_type?: string;
+    gear_type?: string;
+  }) {
+    const search = new URLSearchParams();
+    if (params.make)             search.set("make", params.make);
+    if (params.class_name)       search.set("class_name", params.class_name);
+    if (params.trim)             search.set("trim", params.trim);
+    if (params.manufacture_year) search.set("manufacture_year", params.manufacture_year);
+    search.set("km", String(params.km));
+    if (params.fuel_type)        search.set("fuel_type", params.fuel_type);
+    if (params.gear_type)        search.set("gear_type", params.gear_type);
+    return apiRequest<{
+      current: { estimated_price_qar: number; confidence_range: [number, number]; segment: string };
+      forecast: { horizon: string; months: number; estimated_price_qar: number; change_pct: number }[];
+      market_trend_annual_pct: number;
+      annual_km_assumption: number;
+      model_version: string;
+      segment: string;
+      r2: number;
+      mape: number;
+    }>(`/ml/forecast?${search.toString()}`);
+  },
 };
