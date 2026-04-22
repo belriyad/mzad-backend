@@ -4135,6 +4135,103 @@ def admin_list_bids(handler, params) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Buy Requests (Want to Buy)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def ensure_buy_request_schema() -> None:
+    with db_connect() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS buy_requests (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_uid     TEXT UNIQUE NOT NULL,
+                make            TEXT NOT NULL,
+                class_name      TEXT NOT NULL,
+                trim            TEXT,
+                year_min        INTEGER,
+                year_max        INTEGER,
+                km_max          INTEGER,
+                budget_min_qar  INTEGER,
+                budget_max_qar  INTEGER,
+                city            TEXT,
+                condition       TEXT,
+                contact_name    TEXT NOT NULL,
+                contact_phone   TEXT NOT NULL,
+                contact_email   TEXT,
+                notes           TEXT,
+                estimate_qar    INTEGER,
+                status          TEXT NOT NULL DEFAULT 'open',
+                created_at      TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+
+def create_buy_request(handler: "SimpleHTTPRequestHandler", payload: dict) -> tuple[dict, int]:
+    make       = str(payload.get("make", "")).strip()
+    class_name = str(payload.get("class_name", "")).strip()
+    contact_name  = str(payload.get("contact_name", "")).strip()
+    contact_phone = str(payload.get("contact_phone", "")).strip()
+
+    if not make or not class_name:
+        raise ValueError("make and class_name are required")
+    if not contact_name or not contact_phone:
+        raise ValueError("contact_name and contact_phone are required")
+
+    uid = "br_" + secrets.token_hex(12)
+    now = utc_now_iso()
+
+    row = {
+        "request_uid":    uid,
+        "make":           make,
+        "class_name":     class_name,
+        "trim":           str(payload.get("trim", "")).strip() or None,
+        "year_min":       payload.get("year_min") or None,
+        "year_max":       payload.get("year_max") or None,
+        "km_max":         payload.get("km_max") or None,
+        "budget_min_qar": payload.get("budget_min_qar") or None,
+        "budget_max_qar": payload.get("budget_max_qar") or None,
+        "city":           str(payload.get("city", "")).strip() or None,
+        "condition":      str(payload.get("condition", "")).strip() or None,
+        "contact_name":   contact_name,
+        "contact_phone":  contact_phone,
+        "contact_email":  str(payload.get("contact_email", "")).strip() or None,
+        "notes":          str(payload.get("notes", "")).strip() or None,
+        "estimate_qar":   payload.get("estimate_qar") or None,
+        "status":         "open",
+        "created_at":     now,
+    }
+
+    with db_connect() as conn:
+        conn.execute("""
+            INSERT INTO buy_requests
+              (request_uid, make, class_name, trim, year_min, year_max, km_max,
+               budget_min_qar, budget_max_qar, city, condition,
+               contact_name, contact_phone, contact_email, notes, estimate_qar, status, created_at)
+            VALUES
+              (:request_uid, :make, :class_name, :trim, :year_min, :year_max, :km_max,
+               :budget_min_qar, :budget_max_qar, :city, :condition,
+               :contact_name, :contact_phone, :contact_email, :notes, :estimate_qar, :status, :created_at)
+        """, row)
+        conn.commit()
+
+    return {"ok": True, "request_uid": uid}, 201
+
+
+def list_buy_requests(handler: "SimpleHTTPRequestHandler", params: dict) -> dict:
+    """Admin-only: list all buy requests."""
+    limit  = parse_int(params.get("limit", ["50"])[0], 50)
+    offset = parse_int(params.get("offset", ["0"])[0], 0)
+    with db_connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM buy_requests ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM buy_requests").fetchone()[0]
+    return {"rows": [dict(r) for r in rows], "total": total}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # ML Valuation
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -4438,6 +4535,11 @@ class Handler(SimpleHTTPRequestHandler):
                 data, status = create_saved_filter(self, user, payload)
                 self.send_json(data, status=status)
                 return
+            # ── Buy Requests POST ──────────────────────────────────────────
+            if parsed.path == "/api/buy-requests":
+                data, status = create_buy_request(self, payload)
+                self.send_json(data, status=status)
+                return
             # BE-001: phone access requests
             if parsed.path.startswith("/api/instant-offers/requests/") and parsed.path.endswith("/phone-request/approve"):
                 uid = parsed.path[len("/api/instant-offers/requests/"):-len("/phone-request/approve")].strip("/")
@@ -4720,6 +4822,12 @@ class Handler(SimpleHTTPRequestHandler):
                 params = parse_qs(parsed.query)
                 self.send_json(ml_estimate(params))
                 return
+            # ── Buy Requests GET (admin) ───────────────────────────────────
+            if parsed.path == "/api/buy-requests":
+                require_admin(self)
+                params = parse_qs(parsed.query)
+                self.send_json(list_buy_requests(self, params))
+                return
             # ── Instant Offers GET routes ──────────────────────────────────
             if parsed.path == "/api/instant-offers/comps":
                 params = parse_qs(parsed.query)
@@ -4866,6 +4974,7 @@ def main() -> None:
                 raise
 
     ensure_instant_offer_schema()
+    ensure_buy_request_schema()
     try:
         recompute_deals_in_db()
     except Exception as exc:  # noqa: BLE001
