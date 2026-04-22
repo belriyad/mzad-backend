@@ -111,8 +111,8 @@ export default function ValuationPage() {
           {/* Price forecast */}
           <Card className="p-4 space-y-3">
             <p className="text-sm font-medium">Price forecast</p>
-            <div className="grid grid-cols-3 gap-3">
-              {result.forecast.map((f) => {
+            <div className="grid grid-cols-2 gap-3">
+              {result.forecast.filter(f => f.horizon !== "12m").map((f) => {
                 const isPos = f.change_pct >= 0;
                 return (
                   <div key={f.horizon} className="rounded-lg border p-3 space-y-1 text-center">
