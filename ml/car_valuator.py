@@ -115,11 +115,15 @@ def estimate_price(features: dict) -> dict:
     predicted = float(np.expm1(log_pred))
     predicted = max(1000.0, predicted)
 
-    mae = seg_meta["mae"]
+    # Confidence range: ±(MAPE/2 × predicted).
+    # MAPE is the mean absolute percentage error, so ±half gives a tight
+    # "likely" band proportional to price — much tighter than ±MAE.
+    mape_pct   = seg_meta["mape"]
+    half_range = predicted * (mape_pct / 100.0) * 0.5
     return {
         "estimated_price_qar": round(predicted, 0),
-        "confidence_range":    [round(max(0.0, predicted - mae), 0),
-                                 round(predicted + mae, 0)],
+        "confidence_range":    [round(max(0.0, predicted - half_range), 0),
+                                 round(predicted + half_range, 0)],
         "segment":             segment,
         "model_version":       _meta["model_version"],
         "r2":                  round(seg_meta["r2"], 4),
